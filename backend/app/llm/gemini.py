@@ -93,11 +93,22 @@ def _preview(contents: Sequence[types.Content], limit: int = 4) -> list[dict[str
 class GeminiClient:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self._client = genai.Client(api_key=settings.gemini_api_key.get_secret_value() or None)
+        api_key = settings.gemini_api_key.get_secret_value() or None
+        self._client = genai.Client(api_key=api_key)
+        # The Live (bidiGenerateContent) API is only served on v1beta/v1alpha; the SDK's default "v1"
+        # rejects the WebSocket handshake with a bare HTTP 404.
+        self._live_client = genai.Client(
+            api_key=api_key, http_options=types.HttpOptions(api_version=settings.live_api_version)
+        )
 
     @property
     def raw(self) -> genai.Client:
         return self._client
+
+    @property
+    def live(self) -> genai.Client:
+        """Client pinned to the API version that serves the Live API."""
+        return self._live_client
 
     # ------------------------------------------------------------------------------------
     # Streaming agent step

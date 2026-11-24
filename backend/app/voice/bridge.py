@@ -124,7 +124,7 @@ class VoiceBridge:
 
         connected = False
         try:
-            async with self.deps.llm.raw.aio.live.connect(model=s.live_model, config=config) as live:
+            async with self.deps.llm.live.aio.live.connect(model=s.live_model, config=config) as live:
                 if history:
                     # Shared memory: replay prior chat/voice turns so the caller can switch modes seamlessly.
                     seed_turns: list[types.Content | types.ContentDict] = list(history_to_contents(history))
@@ -190,7 +190,7 @@ class VoiceBridge:
                                     turn.started = True
                                     await emit(TurnStart(turn_id=turn.ctx.turn_id, mode="voice"))
                                     await emit(VoiceState(state="listening"))
-                                turn.user_text += sc.input_transcription.text
+                                turn.user_text = join_transcript(turn.user_text, sc.input_transcription.text)
                                 turn.last_user_audio_at = time.perf_counter()
                                 await emit(Transcript(role="user", text=turn.user_text.strip(), final=False))
                             if sc.model_turn and sc.model_turn.parts:
@@ -202,7 +202,7 @@ class VoiceBridge:
                                             await emit(VoiceState(state="speaking"))
                                         await send_audio(part.inline_data.data)
                             if sc.output_transcription and sc.output_transcription.text:
-                                turn.assistant_text += sc.output_transcription.text
+                                turn.assistant_text = join_transcript(turn.assistant_text, sc.output_transcription.text)
                                 await emit(Transcript(role="assistant", text=turn.assistant_text.strip(), final=False))
                             if sc.interrupted:
                                 # Barge-in: the client must flush queued playback immediately.
@@ -342,6 +342,13 @@ def _discard(tasks: dict[str, asyncio.Task[None]], key: str) -> Callable[[asynci
         tasks.pop(key, None)
 
     return callback
+
+
+def join_transcript(current: str, chunk: str) -> str:
+    """Append a streaming transcription chunk; chunks sometimes omit the space after sentence punctuation."""
+    if current and chunk and current[-1] in ".!?," and not chunk[0].isspace():
+        return f"{current} {chunk}"
+    return current + chunk
 
 
 def _safe_json(text: str) -> dict[str, Any]:

@@ -195,3 +195,11 @@ def test_history_merges_consecutive_roles() -> None:
     assert [c.role for c in contents] == ["user", "model", "user"]
     assert contents[2].parts is not None and len(contents[2].parts) == 2
     assert contents[2].parts[0].text == "refund please"  # no imitable markers in content
+
+
+def test_transcript_chunks_are_joined_with_sentence_spacing() -> None:
+    from app.voice.bridge import join_transcript
+
+    assert join_transcript("for your tier.", "Your Pro tier") == "for your tier. Your Pro tier"
+    assert join_transcript("two hun", "dred dollars") == "two hundred dollars"
+    assert join_transcript("", "Hello") == "Hello"

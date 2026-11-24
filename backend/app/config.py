@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     fallback_model: str = "gemini-3.5-flash-lite"
     verifier_model: str = "gemini-3.5-flash-lite"
     live_model: str = "gemini-3.8-live"
+    live_api_version: str = "v1beta"  # Live API is not served on the SDK default "v1"
     live_voice: str = "Kore"
     embedding_model: str = "gemini-embedding-2"
     embedding_dim: int = 768
