@@ -297,6 +297,7 @@ class VoiceBridge:
         meta = {
             "guardrail": vars(guard),
             "tools": ctx.tools_called,
+            "steps": ctx.steps,
             "tickets": [x.id for x in ctx.tickets],
             "interrupted": t.interrupted,
         }

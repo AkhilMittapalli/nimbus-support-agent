@@ -59,6 +59,7 @@ class TurnContext:
     tickets: list[Ticket] = field(default_factory=list)
     tools_called: list[str] = field(default_factory=list)
     tool_failures: list[str] = field(default_factory=list)
+    steps: list[dict[str, Any]] = field(default_factory=list)
     _tool_attempts: dict[str, int] = field(default_factory=dict)
 
     @property

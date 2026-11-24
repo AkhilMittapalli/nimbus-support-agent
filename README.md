@@ -6,7 +6,7 @@ A full-stack customer support AI agent for **Nimbus Cloud**, a fictional file sy
 |---|---|
 | **Frontend** | Next.js (App Router, TypeScript, Tailwind). Streams chat over SSE. Voice uses AudioWorklet mic capture with a 24 kHz playback queue. Includes an observability drawer. |
 | **Backend** | FastAPI (Python 3.12, asyncio), with a custom agent state machine on Gemini function calling. |
-| **Models** | `gemini-3.8-flash` (agent), `gemini-3.5-flash-lite` (fallback and guardrail verifier), `gemini-3.8-live` (native-audio voice), `gemini-embedding-2` (768-d) |
+| **Models** | `gemini-3.5-flash` with minimal thinking (agent), `gemini-3.5-flash-lite` (fallback and guardrail verifier), `gemini-3.8-live` (native-audio voice), `gemini-embedding-2` (768-d). All are configurable. |
 | **Data** | Supabase Postgres + **pgvector** (HNSW) + Postgres full-text search, all in one database for vectors, sessions, traces and the mock CRM |
 | **Deploy** | Frontend on Vercel. Backend as a Docker image on Render (`render.yaml`). Database on Supabase. |
 
@@ -34,7 +34,7 @@ flowchart LR
   end
 
   subgraph Gemini["Gemini API"]
-    Flash["3.8 Flash (agent)"]
+    Flash["3.5 Flash (agent)"]
     Lite["3.5 Flash-Lite<br/>(fallback + verifier)"]
     Live["3.8 Live (native audio)"]
     Emb["Embedding 2"]
@@ -143,12 +143,14 @@ out-scope max=0.649  median=0.532        → RAG_LOW_CONFIDENCE  = 0.66  (inside
 
 **2. Groundedness verification (a check after generation).** `guardrails/groundedness.py` sends the draft answer and the turn's evidence (KB passages, tool outputs, the authoritative session state and earlier answers that already passed the check) to **Flash-Lite with a JSON-schema output**. It lists every unsupported factual claim and returns a supported-claim ratio.
 
+* Each unsupported claim is labelled **material** (amounts, limits, time frames, IDs, eligibility, promises, outcomes) or **minor** (cosmetic labels and wording). Only material claims, or a material-claim score below `GROUNDEDNESS_MIN_SCORE`, trigger retraction. Minor ones are recorded in the trace, so a paraphrased ticket category can't destroy a correct answer.
+* **Scope backstop.** The judge also reports whether the reply *performed* an unrelated task (wrote the poem, answered the trivia). If so, the reply is replaced with a scoped decline and no ticket is opened.
 * Grounded → the answer stands. Confidence = `min(groundedness, retrieval band score)` and is shown as a badge on the message.
 * **Ungrounded → retracted.** The streamed draft is replaced in the UI (`message.replace`) with a safe message, and a ticket is opened automatically.
 * Verifier unavailable → **fail-open but flagged** (confidence capped at 0.6 and the badge marked). This trades strictness for availability, and the trade-off is explicit in the trace.
 * In **voice**, audio can't be un-spoken. There the pre-generation gate is the main defence, and the verifier runs as a **post-hoc audit**: ungrounded voice answers are flagged in the UI and escalated for human review.
 
-`scripts/guardrail_eval.py` is a labelled eval set (grounded paraphrases, limit comparisons and refusals vs. wrong limits, invented time frames, fake ticket IDs and claims with no evidence). **Current result: 7/7.**
+`scripts/guardrail_eval.py` is a labelled eval set (grounded paraphrases, limit comparisons, refusals and cosmetic label mismatches and polite declines vs. an off-topic poem, wrong limits, invented time frames, fake ticket IDs and claims with no evidence). **Current result: 10/10.**
 
 ---
 
@@ -265,6 +267,17 @@ The integration tests drive the **real** orchestrator, tools and database with a
 
 ## Key trade-offs
 
+* **Agent model chosen by measurement.** The same 5-tool scenario (verify → overview → KB → blocked refund → escalation) was benchmarked twice per model through the real pipeline:
+
+  | Agent model | Turn latency | Chain behaviour |
+  |---|---|---|
+  | gemini-3.8-flash (thinking `low`; `minimal` unsupported) | 22–28 s | correct |
+  | gemini-3.5-flash (`low`) | 17–18 s | correct |
+  | **gemini-3.5-flash (`minimal`)**, the default | **10–12 s** (single-tool turns 3–6 s) | correct, consistent |
+  | gemini-3.6-flash (`minimal`) | 10–15 s | skipped the refund attempt in 1 of 2 runs |
+  | gemini-3.5-flash-lite | 5–6 s | inconsistent (skipped refund or escalation) |
+
+  3.5 Flash has a higher per-token price than 3.8 Flash's introductory rate, but minimal thinking produces far fewer billed thinking tokens, so a multi-tool turn still costs about $0.01–0.02 (shown per turn in the drawer) at half the latency. Less reasoning made the model more likely to drift out of scope, which is why the off-topic backstop exists.
 * **Custom state machine instead of LangGraph.** Fewer abstractions, exact control over token streaming, retry and fallback, and guardrail placement, with every transition traced. The cost is re-implementing graph features (checkpointing, branching) that this agent doesn't need.
 * **Stream first, verify after (chat).** Tokens stream immediately for latency, and a failed verification visibly retracts the draft. Buffering until verified would add about 1 s to every answer. Because low-confidence retrieval returns no passages, retractions are rare.
 * **Voice guardrail is post-hoc.** Speech can't be unsaid, so voice relies on the pre-generation gate and flags and escalates afterwards.

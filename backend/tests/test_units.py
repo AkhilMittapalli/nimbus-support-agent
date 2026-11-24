@@ -41,8 +41,15 @@ def test_tables_are_atomic_and_long_sections_split_with_overlap() -> None:
     assert len(chunks) == 1 and chunks[0].content == table
 
     paras = "\n\n".join(f"Paragraph {i} " + "word " * 60 for i in range(8))
-    long_chunks = chunk_markdown(doc_id="d", title="T", body=f"## Long\n\n{paras}", category="c", tiers=["pro"],
-                                 target_tokens=200, overlap_max_tokens=100)
+    long_chunks = chunk_markdown(
+        doc_id="d",
+        title="T",
+        body=f"## Long\n\n{paras}",
+        category="c",
+        tiers=["pro"],
+        target_tokens=200,
+        overlap_max_tokens=100,
+    )
     assert len(long_chunks) > 1
     assert all(estimate_tokens(c.content) <= 200 + 100 for c in long_chunks)
     # one-block overlap: the last paragraph of chunk n starts chunk n+1
@@ -76,14 +83,31 @@ def test_keyword_query_is_sanitised() -> None:
 # Refund policy engine
 # ---------------------------------------------------------------------------------------
 def _customer(tier: str = "pro", status: str = "active") -> Customer:
-    return Customer(id="c", name="n", email="e@x.io", pin_hash="h", company=None, tier=tier,  # type: ignore[arg-type]
-                    contract_status=status, contract_end=None, billing_email="e@x.io", notification_pref="email",
-                    phone=None)
+    return Customer(
+        id="c",
+        name="n",
+        email="e@x.io",
+        pin_hash="h",
+        company=None,
+        tier=tier,  # type: ignore[arg-type]
+        contract_status=status,
+        contract_end=None,
+        billing_email="e@x.io",
+        notification_pref="email",
+        phone=None,
+    )
 
 
 def _invoice(amount: int = 149_00, days_ago: int = 5, refunded: int = 0) -> Invoice:
-    return Invoice(id="INV-1", customer_id="c", description="d", amount_cents=amount, refunded_cents=refunded,
-                   issued_on=TODAY - timedelta(days=days_ago), status="paid")
+    return Invoice(
+        id="INV-1",
+        customer_id="c",
+        description="d",
+        amount_cents=amount,
+        refunded_cents=refunded,
+        issued_on=TODAY - timedelta(days=days_ago),
+        status="paid",
+    )
 
 
 @pytest.mark.parametrize(
@@ -154,16 +178,20 @@ def test_trace_rollup_and_cost() -> None:
     assert data["latency"]["total_ms"] is not None
 
 
-def test_history_merges_roles_and_tags_voice() -> None:
+def test_history_merges_consecutive_roles() -> None:
     now = TODAY
 
     def msg(i: int, role: str, mode: str, text: str) -> Message:
         return Message(id=i, turn_id="t", role=role, mode=mode, content=text, meta={}, created_at=now)  # type: ignore[arg-type]
 
-    contents = history_to_contents([
-        msg(1, "user", "text", "hi"), msg(2, "assistant", "text", "hello"),
-        msg(3, "user", "voice", "refund please"), msg(4, "user", "voice", "invoice 9003"),
-    ])
+    contents = history_to_contents(
+        [
+            msg(1, "user", "text", "hi"),
+            msg(2, "assistant", "text", "hello"),
+            msg(3, "user", "voice", "refund please"),
+            msg(4, "user", "voice", "invoice 9003"),
+        ]
+    )
     assert [c.role for c in contents] == ["user", "model", "user"]
     assert contents[2].parts is not None and len(contents[2].parts) == 2
-    assert contents[2].parts[0].text == "(via voice) refund please"
+    assert contents[2].parts[0].text == "refund please"  # no imitable markers in content

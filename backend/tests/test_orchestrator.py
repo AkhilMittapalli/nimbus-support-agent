@@ -23,7 +23,7 @@ from app.db.pool import create_pool, migrate
 from app.db.repositories import CrmRepo, SessionRepo
 from app.db.seed import reset_demo_data
 from app.errors import LLMUnavailableError
-from app.guardrails.groundedness import GroundednessJudgement
+from app.guardrails.groundedness import GroundednessJudgement, UnsupportedClaim
 from app.llm.gemini import GeminiClient, ModelStep
 from app.observability.tracer import TurnTrace
 from app.rag.store import KnowledgeStore, RetrievalResult, RetrievedChunk
@@ -43,15 +43,17 @@ def call(name: str, **args: Any) -> types.FunctionCall:
 class FakeLLM:
     """Replays a script of model steps: each item is either a list of function calls or final text."""
 
-    def __init__(self, script: list[list[types.FunctionCall] | str], *, grounded: bool = True,
-                 fail: bool = False) -> None:
+    def __init__(
+        self, script: list[list[types.FunctionCall] | str], *, grounded: bool = True, fail: bool = False
+    ) -> None:
         self.script = list(script)
         self.grounded = grounded
         self.fail = fail
         self.seen_contents: list[list[types.Content]] = []
 
-    async def stream_step(self, *, contents: list[types.Content], on_text: Any, trace: TurnTrace,
-                          **_: Any) -> ModelStep:
+    async def stream_step(
+        self, *, contents: list[types.Content], on_text: Any, trace: TurnTrace, **_: Any
+    ) -> ModelStep:
         if self.fail:
             raise LLMUnavailableError("scripted outage")
         self.seen_contents.append(list(contents))
@@ -60,30 +62,46 @@ class FakeLLM:
         if isinstance(item, str):
             for word in item.split(" "):
                 await on_text(word + " ")
-            return ModelStep(model="fake", content=types.Content(role="model", parts=[types.Part(text=item)]),
-                             text=item)
+            return ModelStep(
+                model="fake", content=types.Content(role="model", parts=[types.Part(text=item)]), text=item
+            )
         parts = [types.Part(function_call=fc) for fc in item]
         return ModelStep(model="fake", content=types.Content(role="model", parts=parts), text="", function_calls=item)
 
     async def generate_json(self, *, schema: type[BaseModel], **_: Any) -> BaseModel:
         assert schema is GroundednessJudgement
         if self.grounded:
-            return GroundednessJudgement(kind="factual", unsupported_claims=[], score=1.0)
-        return GroundednessJudgement(kind="factual", unsupported_claims=["invented limit"], score=0.2)
+            return GroundednessJudgement(
+                performs_unrelated_task=False, kind="factual", unsupported_claims=[], score=1.0
+            )
+        return GroundednessJudgement(
+            performs_unrelated_task=False,
+            kind="factual",
+            unsupported_claims=[UnsupportedClaim(claim="invented limit", material=True)],
+            score=0.2,
+        )
 
 
 class FakeKB:
     def __init__(self, similarity: float) -> None:
         self.similarity = similarity
 
-    async def search(self, query: str, *, tier: str | None, trace: Any = None, top_k: int | None = None) -> RetrievalResult:
-        chunk = RetrievedChunk(chunk_id=1, doc_id="refund-policy", title="Refund Policy",
-                               section_path="Refund Policy > Refund limits by tier",
-                               content="Pro: $200.00 per refund within 30 days.", category="billing",
-                               tiers=["pro"], similarity=self.similarity, rrf_score=0.03)
+    async def search(
+        self, query: str, *, tier: str | None, trace: Any = None, top_k: int | None = None
+    ) -> RetrievalResult:
+        chunk = RetrievedChunk(
+            chunk_id=1,
+            doc_id="refund-policy",
+            title="Refund Policy",
+            section_path="Refund Policy > Refund limits by tier",
+            content="Pro: $200.00 per refund within 30 days.",
+            category="billing",
+            tiers=["pro"],
+            similarity=self.similarity,
+            rrf_score=0.03,
+        )
         band = "high" if self.similarity >= 0.75 else "medium" if self.similarity >= 0.66 else "low"
-        return RetrievalResult(query=query, tier_filter=tier, chunks=[chunk], top_similarity=self.similarity,
-                               band=band)  # type: ignore[arg-type]
+        return RetrievalResult(query=query, tier_filter=tier, chunks=[chunk], top_similarity=self.similarity, band=band)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------------------
@@ -111,15 +129,21 @@ async def service_factory(pool: asyncpg.Pool) -> AsyncIterator[Any]:
 
     def make(llm: FakeLLM, similarity: float = 0.8, **overrides: Any) -> ConversationService:
         settings = Settings(database_url=TEST_DSN, enable_chaos=True, **overrides)
-        deps = Deps(settings=settings, llm=cast(GeminiClient, llm), kb=cast(KnowledgeStore, FakeKB(similarity)),
-                    sessions=SessionRepo(pool), crm=CrmRepo(pool))
+        deps = Deps(
+            settings=settings,
+            llm=cast(GeminiClient, llm),
+            kb=cast(KnowledgeStore, FakeKB(similarity)),
+            sessions=SessionRepo(pool),
+            crm=CrmRepo(pool),
+        )
         return ConversationService(deps, build_registry())
 
     yield make
 
 
-async def run_turn(svc: ConversationService, text: str, session_id: uuid.UUID | None = None,
-                   chaos: ChaosConfig | None = None) -> tuple[uuid.UUID, list[dict[str, Any]]]:
+async def run_turn(
+    svc: ConversationService, text: str, session_id: uuid.UUID | None = None, chaos: ChaosConfig | None = None
+) -> tuple[uuid.UUID, list[dict[str, Any]]]:
     sid = session_id or uuid.uuid4()
     events: list[dict[str, Any]] = []
 
@@ -138,13 +162,15 @@ def of(events: list[dict[str, Any]], kind: str) -> list[dict[str, Any]]:
 # Tests
 # ---------------------------------------------------------------------------------------
 async def test_multi_step_refund_chain(service_factory: Any, pool: asyncpg.Pool) -> None:
-    llm = FakeLLM([
-        [call("verify_customer", email="bob@brightlabs.dev", pin="2222")],
-        [call("get_account_overview")],
-        [call("search_knowledge_base", query="refund limits pro")],
-        [call("issue_refund", invoice_id="INV-9003", amount=149, reason="double charged")],
-        "Done - refunded **$149.00** on INV-9003.",
-    ])
+    llm = FakeLLM(
+        [
+            [call("verify_customer", email="bob@brightlabs.dev", pin="2222")],
+            [call("get_account_overview")],
+            [call("search_knowledge_base", query="refund limits pro")],
+            [call("issue_refund", invoice_id="INV-9003", amount=149, reason="double charged")],
+            "Done - refunded **$149.00** on INV-9003.",
+        ]
+    )
     sid, events = await run_turn(service_factory(llm), "I'm bob, pin 2222, refund INV-9003")
 
     starts = [e["tool"] for e in of(events, "step.start")]
@@ -162,6 +188,8 @@ async def test_multi_step_refund_chain(service_factory: Any, pool: asyncpg.Pool)
     assert await pool.fetchval("SELECT verified_customer_id FROM sessions WHERE id = $1", sid) == "cus_1002"
     assert await pool.fetchval("SELECT count(*) FROM messages WHERE session_id = $1", sid) == 2
     assert await pool.fetchval("SELECT count(*) FROM traces WHERE session_id = $1", sid) == 1
+    meta = await pool.fetchval("SELECT meta FROM messages WHERE session_id = $1 AND role = 'assistant'", sid)
+    assert [st["tool"] for st in meta["steps"]] == starts  # steps persisted for restore
 
 
 async def test_actions_blocked_until_verified(service_factory: Any, pool: asyncpg.Pool) -> None:
@@ -173,12 +201,14 @@ async def test_actions_blocked_until_verified(service_factory: Any, pool: asyncp
 
 
 async def test_policy_blocks_over_limit_refund(service_factory: Any, pool: asyncpg.Pool) -> None:
-    llm = FakeLLM([
-        [call("verify_customer", email="carol@example.com", pin="3333")],
-        [call("issue_refund", invoice_id="INV-9005", amount=29, reason="x")],  # within limits
-        [call("issue_refund", invoice_id="INV-9006", amount=79, reason="x")],  # over limit + outside window
-        "One refund done; the other needs Billing.",
-    ])
+    llm = FakeLLM(
+        [
+            [call("verify_customer", email="carol@example.com", pin="3333")],
+            [call("issue_refund", invoice_id="INV-9005", amount=29, reason="x")],  # within limits
+            [call("issue_refund", invoice_id="INV-9006", amount=79, reason="x")],  # over limit + outside window
+            "One refund done; the other needs Billing.",
+        ]
+    )
     _, events = await run_turn(service_factory(llm), "refunds please")
     statuses = [e["status"] for e in of(events, "step.end")]
     assert statuses == ["ok", "ok", "blocked"]
@@ -186,8 +216,14 @@ async def test_policy_blocks_over_limit_refund(service_factory: Any, pool: async
 
 
 async def test_session_memory_spans_turns(service_factory: Any) -> None:
-    llm = FakeLLM([[call("verify_customer", email="alice@acme.io", pin="1234")], "Hi Alice.",
-                   [call("get_account_overview")], "You are on Enterprise."])
+    llm = FakeLLM(
+        [
+            [call("verify_customer", email="alice@acme.io", pin="1234")],
+            "Hi Alice.",
+            [call("get_account_overview")],
+            "You are on Enterprise.",
+        ]
+    )
     svc = service_factory(llm)
     sid, _ = await run_turn(svc, "alice@acme.io 1234")
     _, events = await run_turn(svc, "what's my tier?", session_id=sid)
@@ -197,8 +233,9 @@ async def test_session_memory_spans_turns(service_factory: Any) -> None:
 
 
 async def test_ungrounded_answer_is_retracted_and_escalated(service_factory: Any, pool: asyncpg.Pool) -> None:
-    llm = FakeLLM([[call("search_knowledge_base", query="refund")], "Pro refunds are up to $900 within 1 year."],
-                  grounded=False)
+    llm = FakeLLM(
+        [[call("search_knowledge_base", query="refund")], "Pro refunds are up to $900 within 1 year."], grounded=False
+    )
     sid, events = await run_turn(service_factory(llm), "what is the pro refund limit?")
     assert of(events, "guardrail")[0]["action"] == "retracted"
     assert of(events, "message.replace")[0]["reason"] == "ungrounded"
@@ -217,8 +254,11 @@ async def test_low_confidence_retrieval_routes_to_human(service_factory: Any) ->
 
 async def test_tool_outage_is_reported_to_model_not_user_crash(service_factory: Any) -> None:
     llm = FakeLLM([[call("search_knowledge_base", query="sync")], "Search is down - want a ticket?"])
-    _, events = await run_turn(service_factory(llm), "sync broken",
-                               chaos=ChaosConfig(tool_failure="search_knowledge_base", tool_failure_mode="always"))
+    _, events = await run_turn(
+        service_factory(llm),
+        "sync broken",
+        chaos=ChaosConfig(tool_failure="search_knowledge_base", tool_failure_mode="always"),
+    )
     assert of(events, "step.retry")
     assert of(events, "step.end")[0]["status"] == "error"
     tool_response = llm.seen_contents[1][-1].parts[0].function_response  # type: ignore[index]
@@ -245,3 +285,18 @@ async def test_verification_lockout(service_factory: Any) -> None:
         _, events = await run_turn(svc, "try", session_id=sid)
         summaries.append(of(events, "step.end")[0]["summary"])
     assert summaries[-1] == "Verification locked"
+
+
+async def test_off_topic_reply_is_withdrawn_without_ticket(service_factory: Any) -> None:
+    class OffTopicLLM(FakeLLM):
+        async def generate_json(self, *, schema: type[BaseModel], **_: Any) -> BaseModel:
+            return GroundednessJudgement(
+                performs_unrelated_task=True, kind="conversational", unsupported_claims=[], score=1.0
+            )
+
+    _, events = await run_turn(
+        service_factory(OffTopicLLM(["Roses are red, the ocean is blue, here is a poem for you."])), "write a poem"
+    )
+    assert of(events, "message.replace")[0]["reason"] == "off_topic"
+    assert "only help with Nimbus Cloud" in of(events, "message.done")[0]["text"]
+    assert not of(events, "escalation")

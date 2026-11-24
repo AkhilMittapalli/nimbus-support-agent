@@ -28,16 +28,37 @@ from app.observability.tracer import TurnTrace
 log = structlog.get_logger(__name__)
 
 Band = Literal["high", "medium", "low", "none"]
+OFF_TOPIC = "off_topic: reply engaged with a request outside Nimbus Cloud support"
 _BAND_SCORE: dict[str, float] = {"high": 1.0, "medium": 0.75, "low": 0.3}
 
 
+class UnsupportedClaim(BaseModel):
+    claim: str
+    material: bool = Field(
+        description="true if a customer could be misled or harmed by it: amounts, limits, time frames, dates, IDs, "
+        "eligibility, policy rules, promises or action outcomes. false for cosmetic labels, wording or formatting."
+    )
+
+
 class GroundednessJudgement(BaseModel):
+    performs_unrelated_task: bool = Field(
+        description="true ONLY if the reply actually produces content for a request unrelated to Nimbus Cloud "
+        "support - e.g. it writes the poem, tells the joke, answers the trivia or writes the code. A reply that "
+        "declines, refuses or redirects to Nimbus Cloud topics is false."
+    )
     kind: Literal["conversational", "factual"] = Field(
         description="'conversational' if the reply only greets, asks for information, confirms an action, or "
         "declines; 'factual' if it states policy, numbers, procedures or account facts."
     )
-    unsupported_claims: list[str] = Field(description="Factual claims in the reply NOT supported by the evidence.")
-    score: float = Field(ge=0, le=1, description="Fraction of factual claims that are supported (1.0 if none).")
+    unsupported_claims: list[UnsupportedClaim] = Field(
+        description="Factual claims in the reply NOT supported by the evidence."
+    )
+    score: float = Field(
+        ge=0,
+        le=1,
+        description="Fraction of MATERIAL factual claims that are supported (1.0 if there are none). Minor "
+        "cosmetic mismatches must not lower this score.",
+    )
 
 
 @dataclass
@@ -64,7 +85,7 @@ _JUDGE_SYSTEM = (
 
 def _needs_check(answer: str) -> bool:
     text = answer.strip()
-    return len(text) >= 80 or bool(re.search(r"\d", text))
+    return len(text) >= 40 or bool(re.search(r"\d", text))
 
 
 async def check_groundedness(
@@ -121,16 +142,27 @@ async def check_groundedness(
                 [f"verifier unavailable ({exc.code}); answer shown unverified"],
             )
 
-        span.attrs.update(kind=judgement.kind, score=judgement.score, unsupported=judgement.unsupported_claims)
-        if judgement.kind == "conversational" and not judgement.unsupported_claims:
+        if judgement.performs_unrelated_task:
+            span.status = "blocked"
+            span.attrs.update(kind="off_topic")
+            return GuardrailOutcome(retrieval_band, top_similarity, "ungrounded", None, 0.0, "retracted", [OFF_TOPIC])
+
+        material = [c.claim for c in judgement.unsupported_claims if c.material]
+        minor = [c.claim for c in judgement.unsupported_claims if not c.material]
+        span.attrs.update(
+            kind=judgement.kind, score=judgement.score, unsupported_material=material, unsupported_minor=minor
+        )
+        if judgement.kind == "conversational" and not material:
             conf = retrieval_score if retrieval_score is not None else 1.0
             return GuardrailOutcome(retrieval_band, top_similarity, "grounded", 1.0, conf, "answer", ["conversational"])
 
-        grounded = judgement.score >= settings.groundedness_min_score and not judgement.unsupported_claims
+        # Retract only for material unsupported claims (or a low overall score); cosmetic mismatches
+        # such as a paraphrased ticket category are recorded but don't destroy a correct answer.
+        grounded = judgement.score >= settings.groundedness_min_score and not material
         components = [judgement.score] + ([retrieval_score] if retrieval_score is not None else [])
         confidence = round(min(components), 3)
-        if judgement.unsupported_claims:
-            reasons.extend(f"unsupported: {c}" for c in judgement.unsupported_claims[:5])
+        reasons.extend(f"unsupported: {c}" for c in material[:5])
+        reasons.extend(f"minor (not blocking): {c}" for c in minor[:3])
         if grounded:
             return GuardrailOutcome(
                 retrieval_band, top_similarity, "grounded", judgement.score, confidence, "answer", reasons

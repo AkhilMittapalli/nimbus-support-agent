@@ -91,17 +91,24 @@ class ToolRegistry:
         await ctx.emit(StepStart(step_id=step_id, tool=name, label=label, args=redact(args)))
         started = time.perf_counter()
 
+        retries: list[str] = []
+
         async def finish(
             status: Literal["ok", "error", "blocked"], summary: str, payload: dict[str, Any]
         ) -> dict[str, Any]:
-            await ctx.emit(
-                StepEnd(
-                    step_id=step_id,
-                    tool=name,
-                    status=status,
-                    duration_ms=round((time.perf_counter() - started) * 1000, 1),
-                    summary=summary,
-                )
+            duration_ms = round((time.perf_counter() - started) * 1000, 1)
+            await ctx.emit(StepEnd(step_id=step_id, tool=name, status=status, duration_ms=duration_ms, summary=summary))
+            # Compact record persisted with the assistant message so restored conversations show steps.
+            ctx.steps.append(
+                {
+                    "id": step_id,
+                    "tool": name,
+                    "label": label,
+                    "status": status,
+                    "duration_ms": duration_ms,
+                    "summary": summary,
+                    "retries": list(retries),
+                }
             )
             return payload
 
@@ -150,6 +157,7 @@ class ToolRegistry:
                     log.warning("tool.failed", tool=name, attempt=attempt, reason=reason)
                     if attempt + 1 < attempts:
                         span.attrs.setdefault("retries", []).append(reason)
+                        retries.append(reason)
                         await ctx.emit(StepRetry(step_id=step_id, tool=name, attempt=attempt + 1, reason=reason))
                         await asyncio.sleep(0.4 * (2**attempt))
                 except Exception as exc:  # unexpected bug in a tool: never crash the conversation

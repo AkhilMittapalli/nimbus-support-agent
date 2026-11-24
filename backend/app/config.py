@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # --- Gemini ---------------------------------------------------------------------------
     gemini_api_key: SecretStr = SecretStr("")
-    agent_model: str = "gemini-3.8-flash"
+    agent_model: str = "gemini-3.5-flash"
     fallback_model: str = "gemini-3.5-flash-lite"
     verifier_model: str = "gemini-3.5-flash-lite"
     live_model: str = "gemini-3.8-live"
@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     embedding_model: str = "gemini-embedding-2"
     embedding_dim: int = 768
     # Gemini 3.x "thinking_level" for the agent model (minimal | low | medium | high). Empty = model default.
-    agent_thinking_level: str = "low"
+    agent_thinking_level: str = "minimal"
     agent_temperature: float = 0.2
 
     llm_first_token_timeout_s: float = 20.0

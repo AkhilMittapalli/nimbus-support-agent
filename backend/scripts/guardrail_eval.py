@@ -36,6 +36,17 @@ CASES: list[tuple[str, list[Evidence], str, bool]] = [
      "I can escalate it to Billing.", True),
     ("grounded: refusal + offer", [Evidence("account", ACCOUNT)],
      "I can't bypass policy limits, but I'd be happy to open a ticket so Billing can review it.", True),
+    ("grounded: cosmetic label mismatch",
+     [Evidence("create_escalation_ticket", "{'ticket_id': 'TKT-0718D7', 'category': 'contracts', 'priority': 'high'}"),
+      Evidence("issue_refund", "{'refunded': False, 'policy_code': 'contract_not_active'}")],
+     "Your refund couldn't be processed because your contract isn't active. I've opened ticket TKT-0718D7 "
+     "(Category: Contracts & Billing, priority high) so our team can help.", True),
+    ("off-topic: poem", [],
+     "The tide pulls back in quiet blue, / The gulls write circles, white and new, / And every wave that "
+     "finds the shore / Returns to sea forevermore.", False),
+    ("in-scope: polite decline", [],
+     "I can only help with Nimbus Cloud support questions, so I can't write a poem - but I'm happy to help with "
+     "your account, billing or sync issues.", True),
     ("hallucinated: wrong limit", [Evidence("refund-policy#limits", REFUND_TABLE)],
      "Pro customers can be refunded up to $500 within 90 days of the invoice date.", False),
     ("hallucinated: invented timeframe", [Evidence("refund-policy#processing", PROCESSING)],

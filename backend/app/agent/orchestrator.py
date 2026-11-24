@@ -35,7 +35,7 @@ from app.agent.events import (
 from app.agent.prompts import build_system_prompt
 from app.db.repositories import Customer, Message, Session, Ticket
 from app.errors import AppError, InputRejectedError
-from app.guardrails.groundedness import GuardrailOutcome, check_groundedness
+from app.guardrails.groundedness import OFF_TOPIC, GuardrailOutcome, check_groundedness
 from app.guardrails.input_guard import check_input
 from app.observability.tracer import TurnTrace
 from app.tools.base import ToolRegistry
@@ -46,6 +46,10 @@ RETRACTION_TEXT = (
     "I want to be sure I give you accurate information, and I couldn't verify that answer against our "
     "official policies, so I've withdrawn it. I've opened ticket **{ticket}** so a member of our support team "
     "can confirm the details with you."
+)
+OUT_OF_SCOPE_TEXT = (
+    "I'm Nova, Nimbus Cloud's support assistant, so I can only help with Nimbus Cloud accounts, billing, plans "
+    "and troubleshooting. Is there anything about your Nimbus Cloud service I can help with?"
 )
 STEP_LIMIT_TEXT = (
     "I'm sorry - I wasn't able to complete this request automatically. I've opened ticket **{ticket}** so a "
@@ -58,7 +62,7 @@ def history_to_contents(history: list[Message]) -> list[types.Content]:
     contents: list[types.Content] = []
     for m in history:
         role = "user" if m.role == "user" else "model"
-        text = m.content if m.mode == "text" else f"(via voice) {m.content}"
+        text = m.content
         if contents and contents[-1].role == role:
             contents[-1].parts = [*(contents[-1].parts or []), types.Part(text=text)]
         else:
@@ -240,7 +244,10 @@ class ConversationService:
         else:
             await ctx.emit(Status(label="Verifying answer against policy..."))
             guard = await self._apply_guardrail(ctx, answer)
-            if guard.action == "retracted":
+            if guard.action == "retracted" and OFF_TOPIC in guard.reasons:
+                answer = OUT_OF_SCOPE_TEXT
+                await ctx.emit(MessageReplace(text=answer, reason="off_topic"))
+            elif guard.action == "retracted":
                 ticket = await self.escalate_automatically(
                     ctx,
                     reason="low-confidence answer retracted by guardrail",
@@ -272,6 +279,7 @@ class ConversationService:
         meta = {
             "guardrail": vars(guard),
             "tools": ctx.tools_called,
+            "steps": ctx.steps,
             "tickets": [t.id for t in ctx.tickets],
         }
         await self.deps.sessions.add_message(ctx.session_id, ctx.turn_id, "user", ctx.mode, user_text)

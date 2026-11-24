@@ -22,7 +22,9 @@ class ModelPrice:
 
 
 _DEFAULT_PRICES: dict[str, ModelPrice] = {
-    "gemini-3.8-flash": ModelPrice(input=0.75, output=3.75),
+    "gemini-3.5-flash": ModelPrice(input=1.50, output=9.00),
+    "gemini-3.6-flash": ModelPrice(input=1.50, output=7.50),
+    "gemini-3.8-flash": ModelPrice(input=0.75, output=3.75),  # introductory rate through 2026-12-31
     "gemini-3.5-flash-lite": ModelPrice(input=0.30, output=2.50),
     "gemini-3.1-flash-lite": ModelPrice(input=0.25, output=1.50, audio_input=0.50),
     "gemini-embedding-2": ModelPrice(input=0.15, output=0.0),
