@@ -73,29 +73,6 @@ export function SupportConsole() {
             </div>
           </div>
 
-          <div
-            role="radiogroup"
-            aria-label="Conversation mode"
-            className="flex rounded-full border border-border bg-surface-2 p-0.5 sm:ml-4"
-          >
-            {(["chat", "voice"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                role="radio"
-                aria-checked={mode === m}
-                disabled={!ready || (m === "voice" && state.busy)}
-                onClick={() => void switchMode(m)}
-                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
-                  mode === m ? "bg-accent text-accent-fg shadow-card" : "text-muted hover:text-text"
-                }`}
-              >
-                {m === "chat" ? <Keyboard className="size-3.5" /> : <Mic className="size-3.5" />}
-                <span className="capitalize">{m}</span>
-              </button>
-            ))}
-          </div>
-
           <div className="ml-auto flex items-center gap-1 whitespace-nowrap">
             <DemoAccounts
               onInsert={(t) => {
@@ -150,15 +127,35 @@ export function SupportConsole() {
               />
             </div>
           ) : (
-            <Timeline
-              items={state.items}
-              onRetry={(id) => conv.retry(id, chaosOrNull)}
-              onShowTrace={showTrace}
-            />
+            <Timeline items={state.items} onRetry={(id) => conv.retry(id, chaosOrNull)} onShowTrace={showTrace} />
           )}
         </main>
 
         <div className="shrink-0 pt-2">
+          <div className="mb-2 flex justify-center px-4">
+            <div
+              role="radiogroup"
+              aria-label="Conversation mode"
+              className="flex rounded-full border border-border bg-surface p-0.5 shadow-card"
+            >
+              {(["chat", "voice"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={mode === m}
+                  disabled={!ready || (m === "voice" && state.busy)}
+                  onClick={() => void switchMode(m)}
+                  className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
+                    mode === m ? "bg-accent text-accent-fg shadow-card" : "text-muted hover:text-text"
+                  }`}
+                >
+                  {m === "chat" ? <Keyboard className="size-3.5" /> : <Mic className="size-3.5" />}
+                  <span className="capitalize">{m}</span>
+                </button>
+              ))}
+            </div>
+          </div>
           {mode === "chat" ? (
             <Composer
               value={input}
