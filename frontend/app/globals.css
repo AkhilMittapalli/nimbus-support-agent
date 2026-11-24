@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Skyline design tokens: airy daytime sky in light mode, "Skyline at night" in dark mode. */
+/* Skyline design tokens. The brand is always the light sky palette (it does not follow the OS dark mode). */
 :root {
   --bg: #eef5fd;
   --surface: #ffffff;
@@ -34,43 +34,6 @@
   --nova-face: #0e2a4a;
   --nova-halo: #dcebfb;
   color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b1626;
-    --surface: #11223a;
-    --surface-2: #162a46;
-    --surface-3: #1e3657;
-    --border: #1f3654;
-    --border-strong: #2d4a70;
-    --text: #e6f0fb;
-    --muted: #9db3cc;
-    --subtle: #6e88a6;
-    --accent: #5aa2f0;
-    --accent-soft: #15325a;
-    --accent-fg: #06121f;
-    --sky: #8cc2f5;
-    --sunrise: #ffb46b;
-    --sunrise-soft: #33240f;
-    --success: #4fd39a;
-    --success-soft: #0f2c22;
-    --warning: #f2b14c;
-    --warning-soft: #2e2210;
-    --danger: #ff7a80;
-    --danger-soft: #34171b;
-    --violet: #a99dff;
-    --violet-soft: #221f45;
-    --teal: #4cc7d6;
-    --teal-soft: #0f2a2e;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.35), 0 2px 10px rgb(0 0 0 / 0.2);
-    --wave-mic: #5aa2f0;
-    --wave-agent: #ffb46b;
-    --nova-body: #8cc2f5;
-    --nova-face: #0b1626;
-    --nova-halo: #15325a;
-    color-scheme: dark;
-  }
 }
 
 @theme inline {
