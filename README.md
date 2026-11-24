@@ -246,7 +246,7 @@ Demo accounts are listed in the UI ("Demo accounts") and come from `backend/app/
 
 ```bash
 cd backend
-uv run pytest -q                      # 20 unit + 9 integration tests (real Postgres, scripted fake LLM)
+uv run pytest -q                      # 21 unit + 10 integration tests (real Postgres, scripted fake LLM)
 uv run mypy app                       # strict
 uv run ruff check app tests
 uv run python -m app.cli calibrate    # retrieval threshold calibration (real API)
