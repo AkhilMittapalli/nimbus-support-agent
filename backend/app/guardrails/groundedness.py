@@ -77,9 +77,11 @@ _JUDGE_SYSTEM = (
     "base passages and system/tool outputs) and a REPLY. Identify every factual claim in the REPLY (policy "
     "rules, limits, amounts, time frames, procedures, account facts, ticket or refund IDs). A claim is supported "
     "only if the EVIDENCE states it or it follows directly from it - simple arithmetic, comparisons against a "
-    "stated limit, and logical consequences of stated rules count as supported. Restating the customer's own "
-    "request, general courtesy, questions to the customer, refusals to break policy, and offers to escalate are "
-    "not factual claims. Be strict about numbers, time frames and IDs that do not appear in the EVIDENCE."
+    "stated limit, and logical consequences of stated rules count as supported. The following are NOT factual "
+    "claims and must never be listed as unsupported: restating the customer's request; courtesy; questions to "
+    "the customer; requests for the customer's details (e.g. 'please share your email and 4-digit PIN so I can "
+    "verify your account'); offers to help further, to verify identity, or to escalate; refusals to break "
+    "policy. Be strict about numbers, time frames, IDs, steps and rules that do not appear in the EVIDENCE."
 )
 
 

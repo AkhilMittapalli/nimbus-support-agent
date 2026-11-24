@@ -45,6 +45,7 @@ async def main() -> None:
     ap.add_argument("--session")
     ap.add_argument("--barge-in", action="store_true")
     ap.add_argument("--base", default="http://localhost:8000")
+    ap.add_argument("--origin", default="http://localhost:3000", help="Origin header (must be in CORS_ORIGINS)")
     a = ap.parse_args()
     sid = a.session or httpx.post(f"{a.base}/api/sessions").json()["session_id"]
     url = a.base.replace("http", "ws", 1) + f"/ws/voice?session_id={sid}"
@@ -54,7 +55,7 @@ async def main() -> None:
     speaking = asyncio.Event()
     turns_done = 0
 
-    async with websockets.connect(url, max_size=None, origin="http://localhost:3000") as ws:  # type: ignore[arg-type]
+    async with websockets.connect(url, max_size=None, origin=a.origin) as ws:  # type: ignore[arg-type]
 
         async def reader() -> None:
             nonlocal audio_bytes, turns_done

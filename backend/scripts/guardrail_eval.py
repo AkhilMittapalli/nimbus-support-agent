@@ -41,6 +41,14 @@ CASES: list[tuple[str, list[Evidence], str, bool]] = [
       Evidence("issue_refund", "{'refunded': False, 'policy_code': 'contract_not_active'}")],
      "Your refund couldn't be processed because your contract isn't active. I've opened ticket TKT-0718D7 "
      "(Category: Contracts & Billing, priority high) so our team can help.", True),
+    ("grounded: steps + verification request",
+     [Evidence("troubleshooting-sync#Files are not syncing",
+               "1. Check the Nimbus desktop app status icon. A grey cloud means sync is paused; click it and choose "
+               "Resume sync. 4. Restart the desktop app. On Windows, right-click the tray icon and choose Quit, then "
+               "reopen it.")],
+     "Try these steps: 1. If the Nimbus tray icon is grey, sync is paused - click it and choose **Resume sync**. "
+     "2. Right-click the tray icon, choose **Quit**, then reopen the app. If it's still stuck, please share your "
+     "account email and 4-digit support PIN so I can verify your account and look further.", True),
     ("off-topic: poem", [],
      "The tide pulls back in quiet blue, / The gulls write circles, white and new, / And every wave that "
      "finds the shore / Returns to sea forevermore.", False),

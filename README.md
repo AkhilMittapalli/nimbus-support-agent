@@ -8,9 +8,11 @@ A full-stack customer support AI agent for **Nimbus Cloud**, a fictional file sy
 | **Backend** | FastAPI (Python 3.12, asyncio), with a custom agent state machine on Gemini function calling. |
 | **Models** | `gemini-3.5-flash` with minimal thinking (agent), `gemini-3.5-flash-lite` (fallback and guardrail verifier), `gemini-3.8-live` (native-audio voice), `gemini-embedding-2` (768-d). All are configurable. |
 | **Data** | Supabase Postgres + **pgvector** (HNSW) + Postgres full-text search, all in one database for vectors, sessions, traces and the mock CRM |
-| **Deploy** | Frontend on Vercel. Backend as a Docker image on Render (`render.yaml`). Database on Supabase. |
+| **Deploy** | Frontend and backend as two Vercel projects (FastAPI on Vercel's Python runtime with WebSockets). Database on Supabase. A Dockerfile and `render.yaml` are included for container hosts. |
 
-> Live demo: _add URL after deployment_ · Loom walkthrough: _add URL_
+> **Live demo: https://nimbus-support-web.vercel.app** (API: https://nimbus-support-api.vercel.app/readyz) · Loom walkthrough: _add URL_
+>
+> Voice needs Chrome or Edge and microphone access; headphones recommended. Demo logins are under the key icon ("Demo accounts").
 
 ---
 
@@ -150,7 +152,7 @@ out-scope max=0.649  median=0.532        → RAG_LOW_CONFIDENCE  = 0.66  (inside
 * Verifier unavailable → **fail-open but flagged** (confidence capped at 0.6 and the badge marked). This trades strictness for availability, and the trade-off is explicit in the trace.
 * In **voice**, audio can't be un-spoken. There the pre-generation gate is the main defence, and the verifier runs as a **post-hoc audit**: ungrounded voice answers are flagged in the UI and escalated for human review.
 
-`scripts/guardrail_eval.py` is a labelled eval set (grounded paraphrases, limit comparisons, refusals and cosmetic label mismatches and polite declines vs. an off-topic poem, wrong limits, invented time frames, fake ticket IDs and claims with no evidence). **Current result: 10/10.**
+`scripts/guardrail_eval.py` is a labelled eval set (grounded paraphrases, limit comparisons, refusals and cosmetic label mismatches, polite declines and requests for the customer's PIN vs. an off-topic poem, wrong limits, invented time frames, fake ticket IDs and claims with no evidence). **Current result: 11/11, stable across 3 consecutive runs.**
 
 ---
 
@@ -259,9 +261,30 @@ The integration tests drive the **real** orchestrator, tools and database with a
 
 ## Deployment
 
-1. **Supabase**: create a project. pgvector is enabled by `CREATE EXTENSION IF NOT EXISTS vector` on first boot. Copy the connection string (the session pooler works; with the transaction pooler on port 6543, keep `DB_STATEMENT_CACHE_SIZE=0`).
-2. **Render**: create a new **Blueprint** from this repo (`render.yaml`). Set `GEMINI_API_KEY`, `DATABASE_URL`, and `CORS_ORIGINS=["https://<your-vercel-app>.vercel.app"]`. Use an always-on plan, because sleeping instances drop WebSocket voice sessions. On first boot the container migrates, seeds and embeds the KB.
-3. **Vercel**: import the repo with root directory `frontend` and set `NEXT_PUBLIC_API_URL=https://<render-service>.onrender.com`.
+The live demo runs as **two Vercel projects** from this repo plus **Supabase**:
+
+| Project | Root directory | Config |
+|---|---|---|
+| `nimbus-support-web` | `frontend` | `frontend/vercel.json` (Next.js). Env: `NEXT_PUBLIC_API_URL` |
+| `nimbus-support-api` | `backend` | `backend/vercel.json` (FastAPI, `app/main.py`, `maxDuration` 300 s). Env: see below |
+
+1. **Supabase.** Create a project and copy the **transaction pooler** connection string (port 6543). URL-encode special characters in the password.
+2. **Initialise the database once, from your machine.** This runs the schema (enables pgvector), seeds the mock CRM and embeds the KB:
+   ```bash
+   cd backend
+   DATABASE_URL=<supabase-url> uv run python -m app.cli migrate
+   DATABASE_URL=<supabase-url> uv run python -m app.cli seed
+   DATABASE_URL=<supabase-url> uv run python -m app.cli ingest
+   ```
+3. **Backend project.** Set `GEMINI_API_KEY` (sensitive), `DATABASE_URL`, `CORS_ORIGINS=["https://<frontend>.vercel.app"]`, `ENV=production`, `AUTO_MIGRATE=false`, `AUTO_SEED=false`, `AUTO_INGEST=false`, `DB_POOL_MIN=0`, `DB_POOL_MAX=4` and `VOICE_MAX_SESSION_S=285`, then deploy.
+4. **Frontend project.** Set `NEXT_PUBLIC_API_URL=https://<backend>.vercel.app` and deploy.
+
+**Serverless notes:**
+* Vercel caps function duration, and with it WebSocket connections, at **300 s on Hobby** (800 s on Pro). Voice sessions are capped at 285 s, and the UI offers Reconnect; conversation history is replayed, so context survives.
+* Start-up migration, seeding and ingestion are disabled in production so cold starts stay fast. Schema changes are applied with the CLI.
+* Each function instance has its own small asyncpg pool (`statement_cache_size=0` for the Supabase pooler).
+
+**Container alternative.** `backend/Dockerfile` and `render.yaml` run the same API as one always-on instance (Render, Fly, Cloud Run). This is useful when voice sessions must outlast serverless duration limits.
 
 ---
 
@@ -283,6 +306,6 @@ The integration tests drive the **real** orchestrator, tools and database with a
 * **Voice guardrail is post-hoc.** Speech can't be unsaid, so voice relies on the pre-generation gate and flags and escalates afterwards.
 * **Server-side voice proxy.** The key stays private and tools and policy are shared with chat, at the cost of one extra hop and server bandwidth (about 32 KB/s up, 48 KB/s down per call).
 * **One database.** pgvector, sessions, traces and the mock CRM all live in Supabase Postgres: one connection pool, transactional refunds, simple operations. A dedicated vector database would only pay off at much larger corpus sizes.
-* **In-process rate limiting.** Correct for a single instance (the deployed configuration). Horizontal scaling would move the limiter and voice guard to Redis behind the same interface.
+* **In-process rate limiting.** On Vercel each function instance keeps its own counters, so limits are per instance (best-effort). That's fine for a demo. Production would move the limiter and voice concurrency guard to Redis (e.g. Upstash) behind the same interface.
 * **Fail-open verifier.** Availability is chosen over strictness when the verifier is down, and the answer is visibly flagged. Set `GROUNDEDNESS_ENABLED` and adjust the code path for fail-closed if needed.
 * **Cost estimates** come from a static price table (overridable), not from billing data.
