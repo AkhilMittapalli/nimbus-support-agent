@@ -279,6 +279,8 @@ The live demo runs as **two Vercel projects** from this repo plus **Supabase**:
 3. **Backend project.** Set `GEMINI_API_KEY` (sensitive), `DATABASE_URL`, `CORS_ORIGINS=["https://<frontend>.vercel.app"]`, `ENV=production`, `AUTO_MIGRATE=false`, `AUTO_SEED=false`, `AUTO_INGEST=false`, `DB_POOL_MIN=0`, `DB_POOL_MAX=4` and `VOICE_MAX_SESSION_S=285`, then deploy.
 4. **Frontend project.** Set `NEXT_PUBLIC_API_URL=https://<backend>.vercel.app` and deploy.
 
+Both projects are connected to this GitHub repo with their root directories set, so **every push to `main` deploys production** and pull requests get preview deployments.
+
 **Serverless notes:**
 * Vercel caps function duration, and with it WebSocket connections, at **300 s on Hobby** (800 s on Pro). Voice sessions are capped at 285 s, and the UI offers Reconnect; conversation history is replayed, so context survives.
 * Start-up migration, seeding and ingestion are disabled in production so cold starts stay fast. Schema changes are applied with the CLI.
