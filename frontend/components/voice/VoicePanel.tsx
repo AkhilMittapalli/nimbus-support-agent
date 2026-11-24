@@ -145,8 +145,8 @@ export function VoicePanel({ voice, onExit }: { voice: VoiceSession; onExit: () 
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-3 overflow-hidden rounded-2xl bg-surface-2 pl-3">
-              <NovaAvatar size={52} mood={PHASE_MOOD[voice.phase]} />
+            <div className="flex items-center gap-3 overflow-hidden rounded-full bg-surface-2 py-1.5 pr-4 pl-1.5">
+              <NovaAvatar size={40} mood={PHASE_MOOD[voice.phase]} />
               <div className="min-w-0 flex-1">
                 <Waveform mic={voice.micAnalyser} agent={voice.outAnalyser} />
               </div>
