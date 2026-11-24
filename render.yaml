@@ -1,0 +1,27 @@
+# Render Blueprint for the backend API. The frontend deploys to Vercel (see README).
+# Secrets (GEMINI_API_KEY, DATABASE_URL, CORS_ORIGINS) are set in the Render dashboard (sync: false).
+services:
+  - type: web
+    name: nimbus-support-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: starter            # always-on instance: free plans sleep, which breaks WebSocket voice sessions
+    region: oregon
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: ENV
+        value: production
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false          # e.g. ["https://nimbus-support.vercel.app"]
+      - key: DB_STATEMENT_CACHE_SIZE
+        value: "0"
+      - key: ENABLE_CHAOS
+        value: "true"
+      - key: DEMO_MODE
+        value: "true"
