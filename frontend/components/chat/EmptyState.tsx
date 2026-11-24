@@ -1,4 +1,5 @@
-import { Headset, Sparkles } from "lucide-react";
+import { NovaAvatar } from "@/components/brand/NovaAvatar";
+import { Sparkles } from "lucide-react";
 
 export const STARTER_PROMPTS: { title: string; text: string }[] = [
   {
@@ -30,10 +31,8 @@ export const STARTER_PROMPTS: { title: string; text: string }[] = [
 export function EmptyState({ onPick, disabled }: { onPick: (text: string) => void; disabled: boolean }) {
   return (
     <div className="mx-auto flex max-w-2xl flex-col items-center px-4 py-10 text-center sm:py-16">
-      <div className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-accent-soft text-accent">
-        <Headset className="size-6" />
-      </div>
-      <h1 className="text-xl font-semibold tracking-tight">Hi, I&apos;m Nova from Nimbus Cloud support</h1>
+      <NovaAvatar size={72} className="mb-4" />
+      <h1 className="font-brand text-2xl font-semibold tracking-tight">Hi, I&apos;m Nova from Nimbus Cloud support</h1>
       <p className="mt-2 max-w-md text-sm text-muted">
         Ask about billing, refunds, plans or troubleshooting - by chat or voice. I verify your identity, check your
         tier and policies, and take action within policy limits.
@@ -45,7 +44,7 @@ export function EmptyState({ onPick, disabled }: { onPick: (text: string) => voi
             type="button"
             disabled={disabled}
             onClick={() => onPick(p.text)}
-            className="group rounded-xl border border-border bg-surface p-3 text-left shadow-card transition-colors hover:border-accent/50 hover:bg-accent-soft/40 disabled:opacity-50"
+            className="group rounded-2xl border border-border bg-surface p-3.5 text-left shadow-card transition-all hover:-translate-y-0.5 hover:border-accent/50 hover:bg-accent-soft/40 disabled:opacity-50"
           >
             <span className="flex items-center gap-1.5 text-sm font-medium">
               <Sparkles className="size-3.5 text-accent" /> {p.title}

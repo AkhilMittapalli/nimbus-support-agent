@@ -1,6 +1,7 @@
 "use client";
 
-import { Activity, AlertTriangle, Bot, Loader2, Mic, RotateCw, ShieldOff, Square } from "lucide-react";
+import { NovaAvatar } from "@/components/brand/NovaAvatar";
+import { Activity, AlertTriangle, Loader2, Mic, RotateCw, ShieldOff, Square } from "lucide-react";
 
 import type { AssistantItem, UserItem } from "@/lib/conversation";
 
@@ -16,7 +17,7 @@ export function UserBubble({ item }: { item: UserItem }) {
     <div className="flex justify-end">
       <div className="max-w-[85%] sm:max-w-[75%]">
         <div
-          className={`rounded-2xl rounded-br-md px-3.5 py-2 text-sm whitespace-pre-wrap break-words ${
+          className={`rounded-2xl rounded-br-md px-3.5 py-2 text-sm whitespace-pre-wrap break-words shadow-card ${
             item.live ? "bg-accent/70 text-accent-fg italic" : "bg-accent text-accent-fg"
           }`}
         >
@@ -53,12 +54,7 @@ export function AssistantBubble({
   const waiting = item.streaming && !item.text;
   return (
     <div className="flex gap-2.5">
-      <div
-        className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-violet-soft text-violet"
-        aria-hidden
-      >
-        <Bot className="size-4" />
-      </div>
+      <NovaAvatar size={30} mood={item.streaming ? "thinking" : "idle"} className="mt-0.5" />
       <div className="min-w-0 max-w-[92%] flex-1 sm:max-w-[80%]">
         <StepTimeline steps={item.steps} />
 
@@ -83,7 +79,7 @@ export function AssistantBubble({
         )}
 
         {(item.text || waiting) && (
-          <div className="rounded-2xl rounded-tl-md border border-border bg-surface px-3.5 py-2.5 text-sm shadow-card">
+          <div className="rounded-2xl rounded-bl-md border border-border bg-surface px-3.5 py-2.5 text-sm shadow-card">
             {waiting ? (
               <span className="flex items-center gap-2 text-muted" role="status">
                 <Loader2 className="size-3.5 animate-spin" />

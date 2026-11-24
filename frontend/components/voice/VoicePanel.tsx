@@ -17,6 +17,7 @@ import {
 import type { VoiceSession } from "@/hooks/useVoiceSession";
 import type { EnginePreference, VoicePhase } from "@/hooks/voiceTypes";
 
+import { NovaAvatar, type NovaMood } from "../brand/NovaAvatar";
 import { Button } from "../ui/IconButton";
 import { Waveform } from "./Waveform";
 
@@ -38,9 +39,21 @@ const ENGINES: { value: EnginePreference; label: string; hint: string }[] = [
   { value: "pipeline", label: "Pipeline", hint: "Browser speech-to-text → agent → text-to-speech" },
 ];
 
+const PHASE_MOOD: Record<VoicePhase, NovaMood> = {
+  idle: "idle",
+  "requesting-mic": "thinking",
+  connecting: "thinking",
+  ready: "idle",
+  listening: "listening",
+  thinking: "thinking",
+  speaking: "speaking",
+  closed: "offline",
+  error: "offline",
+};
+
 function EngineSelector({ voice }: { voice: VoiceSession }) {
   return (
-    <div role="radiogroup" aria-label="Voice engine" className="flex rounded-lg border border-border bg-surface-2 p-0.5">
+    <div role="radiogroup" aria-label="Voice engine" className="flex rounded-full border border-border bg-surface-2 p-0.5">
       {ENGINES.map((e) => (
         <button
           key={e.value}
@@ -50,8 +63,8 @@ function EngineSelector({ voice }: { voice: VoiceSession }) {
           title={e.hint}
           disabled={e.value === "pipeline" && !voice.pipelineAvailable}
           onClick={() => void voice.setPreference(e.value)}
-          className={`rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors disabled:opacity-40 ${
-            voice.preference === e.value ? "bg-surface text-text shadow-card" : "text-muted hover:text-text"
+          className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors disabled:opacity-40 ${
+            voice.preference === e.value ? "bg-accent text-accent-fg shadow-card" : "text-muted hover:text-text"
           }`}
         >
           {e.label}
@@ -132,8 +145,11 @@ export function VoicePanel({ voice, onExit }: { voice: VoiceSession; onExit: () 
                 </span>
               </div>
             </div>
-            <div className="overflow-hidden rounded-xl bg-surface-2">
-              <Waveform mic={voice.micAnalyser} agent={voice.outAnalyser} />
+            <div className="flex items-center gap-3 overflow-hidden rounded-2xl bg-surface-2 pl-3">
+              <NovaAvatar size={52} mood={PHASE_MOOD[voice.phase]} />
+              <div className="min-w-0 flex-1">
+                <Waveform mic={voice.micAnalyser} agent={voice.outAnalyser} />
+              </div>
             </div>
           </>
         )}

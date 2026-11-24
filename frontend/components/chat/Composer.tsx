@@ -45,7 +45,7 @@ export function Composer({
         if (!busy && value.trim() && !over) onSend();
       }}
     >
-      <div className="flex items-end gap-2 rounded-2xl border border-border bg-surface p-2 shadow-card focus-within:border-accent/60">
+      <div className="flex items-end gap-2 rounded-3xl border border-border bg-surface p-2 pl-3 shadow-card focus-within:border-accent/60 focus-within:ring-4 focus-within:ring-accent/10">
         <label htmlFor="composer" className="sr-only">
           Message
         </label>
@@ -65,7 +65,7 @@ export function Composer({
             type="button"
             onClick={onStop}
             aria-label="Stop generating"
-            className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-surface-3 text-text hover:opacity-80"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-3 text-text hover:opacity-80"
           >
             <Square className="size-3.5 fill-current" />
           </button>
@@ -74,7 +74,7 @@ export function Composer({
             type="submit"
             aria-label="Send message"
             disabled={disabled || !value.trim() || over}
-            className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-fg transition-opacity hover:opacity-90 disabled:opacity-40"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-accent-fg transition-opacity hover:opacity-90 disabled:opacity-40"
           >
             <ArrowUp className="size-4" />
           </button>

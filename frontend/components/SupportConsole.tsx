@@ -1,6 +1,7 @@
 "use client";
 
-import { Activity, AlertTriangle, Cloud, Keyboard, Loader2, Mic, Plus, RefreshCw } from "lucide-react";
+import { NovaAvatar } from "@/components/brand/NovaAvatar";
+import { Activity, AlertTriangle, Keyboard, Loader2, Mic, Plus, RefreshCw } from "lucide-react";
 import { useCallback, useState } from "react";
 
 import { useConversation } from "@/hooks/useConversation";
@@ -65,11 +66,9 @@ export function SupportConsole() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 sm:px-4">
           <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
-            <span className="flex size-8 items-center justify-center rounded-lg bg-accent text-accent-fg">
-              <Cloud className="size-4" />
-            </span>
+            <NovaAvatar size={34} mood={state.busy ? "thinking" : "idle"} />
             <div className="hidden leading-tight sm:block">
-              <div className="text-sm font-semibold">Nimbus Support</div>
+              <div className="font-brand text-[15px] font-semibold tracking-tight">Nimbus Support</div>
               <div className="hidden text-[11px] text-subtle sm:block">AI agent · chat & voice</div>
             </div>
           </div>
@@ -77,7 +76,7 @@ export function SupportConsole() {
           <div
             role="radiogroup"
             aria-label="Conversation mode"
-            className="flex rounded-lg border border-border bg-surface-2 p-0.5 sm:ml-4"
+            className="flex rounded-full border border-border bg-surface-2 p-0.5 sm:ml-4"
           >
             {(["chat", "voice"] as const).map((m) => (
               <button
@@ -87,8 +86,8 @@ export function SupportConsole() {
                 aria-checked={mode === m}
                 disabled={!ready || (m === "voice" && state.busy)}
                 onClick={() => void switchMode(m)}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
-                  mode === m ? "bg-surface text-text shadow-card" : "text-muted hover:text-text"
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
+                  mode === m ? "bg-accent text-accent-fg shadow-card" : "text-muted hover:text-text"
                 }`}
               >
                 {m === "chat" ? <Keyboard className="size-3.5" /> : <Mic className="size-3.5" />}
